@@ -79,9 +79,31 @@ def _tensor_conv1d(
     )
     s1 = input_strides
     s2 = weight_strides
-
     # TODO: Implement for Task 4.1.
-    raise NotImplementedError("Need to implement for Task 4.1")
+    # raise NotImplementedError("Need to implement for Task 4.1")
+
+    reverse_coeff = int(reverse)
+    for i in prange(out_size):
+        ti = i + 0
+        out_index = np.empty(MAX_DIMS, np.int32)
+        to_index(ti, out_shape, out_index)
+        temp = 0.0
+        for j in prange(in_channels):
+            tj = j + 0
+            for k in range(kw):
+                tk = k + 0
+                weight_index = np.array([out_index[1], tj, tk])
+                weight_position = index_to_position(weight_index, s2)
+                if (reverse and out_index[2] - tk >= 0) or (
+                    (not reverse) and width > out_index[2] + tk
+                ):
+                    in_index = np.array(
+                        [out_index[0], tj, out_index[2] - (reverse_coeff * 2 - 1) * tk]
+                    )
+                    in_position = index_to_position(in_index, s1)
+                    temp += input[in_position] * weight[weight_position]
+
+        out[ti] = temp
 
 
 tensor_conv1d = njit(parallel=True)(_tensor_conv1d)
@@ -207,7 +229,41 @@ def _tensor_conv2d(
     s20, s21, s22, s23 = s2[0], s2[1], s2[2], s2[3]
 
     # TODO: Implement for Task 4.2.
-    raise NotImplementedError("Need to implement for Task 4.2")
+    # raise NotImplementedError("Need to implement for Task 4.2")
+
+    reverse_coeff = int(reverse)
+    for i in prange(out_size):
+        ti = i + 0
+        out_index = np.empty(MAX_DIMS, np.int32)
+        to_index(ti, out_shape, out_index)
+        temp = 0.0
+        for j in prange(in_channels):
+            tj = j + 0
+            for h in range(kh):
+                th = h + 0
+                for w in range(kw):
+                    tw = w + 0
+                    weight_index = np.array([out_index[1], tj, th, tw])
+                    weight_position = index_to_position(weight_index, s2)
+                    if (
+                        reverse and out_index[3] - tw >= 0 and out_index[2] - th >= 0
+                    ) or (
+                        (not reverse)
+                        and width > out_index[3] + tw
+                        and out_index[2] + th < height
+                    ):
+                        in_index = np.array(
+                            [
+                                out_index[0],
+                                tj,
+                                out_index[2] - (reverse_coeff * 2 - 1) * th,
+                                out_index[3] - (reverse_coeff * 2 - 1) * tw,
+                            ]
+                        )  # height, width
+                        in_position = index_to_position(in_index, s1)
+                        temp += input[in_position] * weight[weight_position]
+
+        out[ti] = temp
 
 
 tensor_conv2d = njit(parallel=True, fastmath=True)(_tensor_conv2d)

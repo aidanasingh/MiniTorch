@@ -35,7 +35,7 @@ class Conv1d(minitorch.Module):
 
     def forward(self, input):
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        return minitorch.conv1d(input, self.weights.value) + self.bias.value
 
 
 class CNNSentimentKim(minitorch.Module):
@@ -62,14 +62,44 @@ class CNNSentimentKim(minitorch.Module):
         super().__init__()
         self.feature_map_size = feature_map_size
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # raise NotImplementedError("Need to implement for Task 4.5")
+        self.embedding_size = embedding_size
+        self.filter_sizes = filter_sizes
+        self.dropout = dropout
+
+        self.conv1 = Conv1d(
+            self.embedding_size, self.feature_map_size, self.filter_sizes[0]
+        )
+        self.conv2 = Conv1d(
+            self.embedding_size, self.feature_map_size, self.filter_sizes[1]
+        )
+        self.conv3 = Conv1d(
+            self.embedding_size, self.feature_map_size, self.filter_sizes[2]
+        )
+
+        self.linear = Linear(self.feature_map_size, 1)
 
     def forward(self, embeddings):
         """
         embeddings tensor: [batch x sentence length x embedding dim]
         """
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # raise NotImplementedError("Need to implement for Task 4.5")
+        batch = embeddings.shape[0]
+        embeddings = embeddings.permute(0, 2, 1)
+        conv1 = self.conv1.forward(embeddings).relu()
+        conv2 = self.conv2.forward(embeddings).relu()
+        conv3 = self.conv3.forward(embeddings).relu()
+        combined = (
+            minitorch.max(conv1, 2)
+            + minitorch.nn.max(conv2, 2)
+            + minitorch.nn.max(conv3, 2)
+        )
+        combined = combined.view(batch, 100)
+        if self.training:
+            combined = minitorch.dropout(combined, self.dropout)
+
+        return self.linear(combined).sigmoid().view(batch)
 
 
 # Evaluation helper methods
@@ -87,7 +117,7 @@ def get_predictions_array(y_true, model_output):
 
 def get_accuracy(predictions_array):
     correct = 0
-    for (y_true, y_pred, logit) in predictions_array:
+    for y_true, y_pred, logit in predictions_array:
         if y_true == y_pred:
             correct += 1
     return correct / len(predictions_array)
@@ -222,7 +252,6 @@ def encode_sentences(
 
 
 def encode_sentiment_data(dataset, pretrained_embeddings, N_train, N_val=0):
-
     #  Determine max sentence length for padding
     max_sentence_len = 0
     for sentence in dataset["train"]["sentence"] + dataset["validation"]["sentence"]:

@@ -42,8 +42,10 @@ def index_to_position(index: Index, strides: Strides) -> int:
     Returns:
         Position in storage
     """
-
-    raise NotImplementedError("Need to include this file from past assignment.")
+    position = 0
+    for ind, stride in zip(index, strides):
+        position += ind * stride
+    return position
 
 
 def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
@@ -59,7 +61,12 @@ def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
         out_index : return index corresponding to position.
 
     """
-    raise NotImplementedError("Need to include this file from past assignment.")
+    cur_ord = ordinal + 0
+    for i in range(len(shape) - 1, -1, -1):
+        sh = shape[i]
+        out_index[i] = int(cur_ord % sh)
+        cur_ord = cur_ord // sh
+    # return
 
 
 def broadcast_index(
@@ -81,7 +88,35 @@ def broadcast_index(
     Returns:
         None
     """
-    raise NotImplementedError("Need to include this file from past assignment.")
+    # Rule 1: Dimension of size 1 broadcasts with anything
+    # Rule 2: Extra dimensions of 1 can be added with `view`
+    # Rule 3: Zip automatically
+
+    # Idea: Slide small shape over big shape, see if dimensions match of have a 1
+
+    for i, s in enumerate(shape):
+        if s > 1:
+            out_index[i] = big_index[i + (len(big_shape) - len(shape))]
+        else:
+            out_index[i] = 0
+    return None
+    # len1 = len(shape)
+    # len2 = len(big_shape)
+    # for i in range(1, len1 + 1):  # assumes shapes are right-aligned
+    #     if shape[len1 - i] == big_shape[len2 - i]:
+    #         out_index[len1 - i] = big_index[len2 - i]
+    #     elif shape[len1 - i] == 1:
+    #         out_index[len1 - i] = 0
+    #     # _ if shape>1 else 0
+    """
+    len1 = len(shape)
+    len2 = len(big_shape)
+    diff = len2 - len1
+    for i in range(len(shape)):
+        out_index[i]= big_index[i+diff] if shape[i] >1 else 0
+    """
+    # 22 tests,
+    return
 
 
 def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
@@ -98,7 +133,49 @@ def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
     Raises:
         IndexingError : if cannot broadcast
     """
-    raise NotImplementedError("Need to include this file from past assignment.")
+    # len1 = len(shape1)
+    # len2 = len(shape2)
+    # shape = [0]
+    # min_len = min([len1, len2])
+
+    # for i in range(1, min_len + 1):  # assumes shapes are right-aligned
+    #     if shape1[len1 - i] == shape2[len2 - i]:  # shapes are equal
+    #         shape.insert(0, shape2[len2 - i])
+    #     elif shape1[len1 - i] == 1:  # shape1 is 1
+    #         shape.insert(0, shape2[len2 - i])
+    #     elif shape2[len2 - i] == 1:  # shape2 is 1
+    #         shape.insert(0, shape1[len1 - i])
+    #     else:
+    #         raise IndexingError("Shapes don't broadcast")
+    # if len1 > len2:
+    #     diff = len1 - len2
+    #     for i in range(1, diff + 1):
+    #         shape.insert(0, shape1[diff - i])
+    # elif len2 > len1:
+    #     diff = len2 - len1
+    #     for i in range(1, diff + 1):
+    #         shape.insert(0, shape2[diff - i])
+
+    # shape = shape[: len(shape) - 1]
+    # return tuple(shape)
+
+    a, b = shape1, shape2
+    m = max(len(a), len(b))
+    c_rev = [0] * m
+    a_rev = list(reversed(a))
+    b_rev = list(reversed(b))
+    for i in range(m):
+        if i >= len(a):
+            c_rev[i] = b_rev[i]
+        elif i >= len(b):
+            c_rev[i] = a_rev[i]
+        else:
+            c_rev[i] = max(a_rev[i], b_rev[i])
+            if a_rev[i] != c_rev[i] and a_rev[i] != 1:
+                raise IndexingError(f"Broadcast failure {a} {b}")
+            if b_rev[i] != c_rev[i] and b_rev[i] != 1:
+                raise IndexingError(f"Broadcast failure {a} {b}")
+    return tuple(reversed(c_rev))
 
 
 def strides_from_shape(shape: UserShape) -> UserStrides:
@@ -172,11 +249,6 @@ class TensorData:
         if isinstance(index, tuple):
             aindex = array(index)
 
-        # Pretend 0-dim shape is 1-dim shape of singleton
-        shape = self.shape
-        if len(shape) == 0 and len(aindex) != 0:
-            shape = (1,)
-
         # Check for errors
         if aindex.shape[0] != len(self.shape):
             raise IndexingError(f"Index {aindex} must be size of {self.shape}.")
@@ -214,7 +286,7 @@ class TensorData:
         Permute the dimensions of the tensor.
 
         Args:
-            *order: a permutation of the dimensions
+            order (list): a permutation of the dimensions
 
         Returns:
             New `TensorData` with the same storage and a new dimension order.
@@ -222,8 +294,20 @@ class TensorData:
         assert list(sorted(order)) == list(
             range(len(self.shape))
         ), f"Must give a position to each dimension. Shape: {self.shape} Order: {order}"
-
-        raise NotImplementedError("Need to include this file from past assignment.")
+        # # Idea: only change shape and strides, not data
+        # shape = tuple(
+        #     [self.shape[d] for d in list(order)]
+        # )  # index self.shape with order
+        # strides = tuple([self.strides[d] for d in list(order)])
+        # new_data = TensorData(
+        #     self._storage, shape, strides
+        # )  # TensorData __init__ calculates strides from shape
+        # return new_data
+        return TensorData(
+            self._storage,
+            tuple([self.shape[o] for o in order]),
+            tuple([self._strides[o] for o in order]),
+        )
 
     def to_string(self) -> str:
         s = ""

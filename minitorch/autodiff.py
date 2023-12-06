@@ -22,7 +22,11 @@ def central_difference(f: Any, *vals: Any, arg: int = 0, epsilon: float = 1e-6) 
     Returns:
         An approximation of $f'_i(x_0, \ldots, x_{n-1})$
     """
-    raise NotImplementedError("Need to include this file from past assignment.")
+    back = list(vals)
+    forward = list(vals)
+    back[arg] -= epsilon / 2
+    forward[arg] += epsilon / 2
+    return (f(*forward) - f(*back)) / epsilon  # rise over run
 
 
 variable_count = 1
@@ -60,7 +64,33 @@ def topological_sort(variable: Variable) -> Iterable[Variable]:
     Returns:
         Non-constant Variables in topological order starting from the right.
     """
-    raise NotImplementedError("Need to include this file from past assignment.")
+    order: List[Variable] = []
+    seen = set()
+
+    def visit(var: Variable) -> None:
+        if var.unique_id in seen or var.is_constant():
+            return
+        if not var.is_leaf():
+            for m in var.parents:
+                if not m.is_constant():
+                    visit(m)
+        seen.add(var.unique_id)
+        order.insert(0, var)
+
+    visit(variable)
+    return order
+    """s = []
+
+    def DFS(node: Variable, s: Iterable[Variable]):
+        if node not in s:
+            for parent in node.parents:
+                DFS(parent,s)
+            #s += [node]
+            s.insert(0, node)
+
+    DFS(variable,s)
+
+    return s"""
 
 
 def backpropagate(variable: Variable, deriv: Any) -> None:
@@ -74,7 +104,46 @@ def backpropagate(variable: Variable, deriv: Any) -> None:
 
     No return. Should write to its results to the derivative values of each leaf through `accumulate_derivative`.
     """
-    raise NotImplementedError("Need to include this file from past assignment.")
+
+    queue = topological_sort(variable)
+    derivatives = {}
+    derivatives[variable.unique_id] = deriv
+    for var in queue:
+        deriv = derivatives[var.unique_id]
+        if var.is_leaf():
+            var.accumulate_derivative(deriv)
+        else:
+            for v, d in var.chain_rule(deriv):
+                if v.is_constant():
+                    continue
+                derivatives.setdefault(v.unique_id, 0.0)
+                derivatives[v.unique_id] = derivatives[v.unique_id] + d
+
+    # idea: scalars track all functions that lead to their creation
+    # idea: scalar implements variable. Since chain rule returns [(scalar, any), ...]
+
+
+"""
+    order = topological_sort(variable)
+    derivs = { variable.unique_id : deriv } # {Scalar: deriv}
+
+    for i in order:
+        if not i.is_leaf():
+            # if i.is_constant:
+            #     derivs[i.unique_id]
+
+            d_out = i.chain_rule(derivs[i.unique_id])
+            for d in d_out:
+                id = list(d)[0].unique_id
+                if id in derivs:
+                    derivs[id]+=list(d)[1]
+                else:
+                    derivs[id]=list(d)[1]
+                    #derivs.update({list(d)[0].unique_id:list(d)[1]})
+        else:
+
+            i.accumulate_derivative(derivs[i.unique_id])
+"""
 
 
 @dataclass
